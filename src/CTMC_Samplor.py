@@ -16,7 +16,7 @@ class CTMC_Samplor(object):
         else:
             self.W = W
 
-        #np.fill_diagonal(self.W,0)
+        np.fill_diagonal(self.W,0)
 
         if b is None:
             self.b = self.rng.normal(0, 1/self.n_units, size=(self.n_units,))
@@ -60,8 +60,8 @@ class CTMC_Samplor(object):
 
 if __name__ == '__main__':
 
-    ctmc_Samplor = CTMC_Samplor(num_units=5)
-    samples,time_intervals = ctmc_Samplor.CTMC_simulation(n_samples=1000)
+    ctmc_Samplor = CTMC_Samplor(num_units=10)
+    samples,time_intervals = ctmc_Samplor.CTMC_simulation(n_samples=10000)
 
     weight = ctmc_Samplor.W
     bias = ctmc_Samplor.b

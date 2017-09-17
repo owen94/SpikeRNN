@@ -3,9 +3,9 @@ This file we define the Energy transition learning  process.
 Basically, we define the conditional log-likelihood, the gradient based on transition,
 check the gradient, and finally do the learning.
 '''
-
 import numpy as np
 import matplotlib.pyplot as plt
+from .utils_srnn import *
 
 class SRNN(object):
     def __init__(self, n_units, W = None, b= None, input= None, time_steps= None,  np_rng = None, temp =1, lr = 0.001):
