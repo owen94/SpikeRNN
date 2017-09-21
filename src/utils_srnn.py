@@ -16,6 +16,9 @@ def unravelparam(theta, d = 4):
 def rmse(a, b):
     return np.sqrt(np.mean((a-b)**2))
 
+def abs_error(a,b):
+    return np.sum(np.abs(a-1))
+
 def computeNumericalGradient(J, theta):
     EPSILON = 0.0001
     numgrad = np.zeros(np.shape(theta))
@@ -31,3 +34,5 @@ def computeNumericalGradient(J, theta):
     num_Wgrad, num_bgrad = unravelparam(numgrad)
 
     return num_Wgrad, num_bgrad
+
+

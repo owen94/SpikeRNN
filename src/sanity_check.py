@@ -4,10 +4,12 @@
 
 import matplotlib.pyplot as plt
 from src.utils_srnn import *
+from scipy.optimize import fmin_l_bfgs_b as minimize
+import os
 
 class SRNN(object):
     def __init__(self, n_units, W = None, b= None, input= None, time_steps= None, batch_sz =1,
-                 np_rng = None, temp =1, lr = 0.001):
+                 np_rng = None, temp =1, lr_1 = 0.001, lr_2 = 0.001):
         if np_rng is None:
             self.rng = np.random.RandomState(1234567)
         else:
@@ -25,7 +27,8 @@ class SRNN(object):
         assert self.W[0, 0] == 0
 
         if b is None:
-            self.b = self.rng.normal(0, 1/self.n_units, size=(self.n_units,))
+            #self.b = self.rng.normal(0, 1/self.n_units, size=(self.n_units,))
+            self.b = np.zeros((self.n_units))
         else:
             self.b = b
 
@@ -35,7 +38,8 @@ class SRNN(object):
         #self.input_for_update = self.input[:-1]
         self.d = self.n_units
 
-        self.lr = lr
+        self.lr_1 = lr_1
+        self.lr_2 = lr_2
         self.time_step = time_steps
         self.batch_sz = batch_sz
 
@@ -95,9 +99,18 @@ class SRNN(object):
     def get_update_no_transit(self):
         self.is_transit = self.check_transition()
         s = (1 - 2 * self.input[:-1])
-        Gamma = np.exp( 0.5/self.temp * (np.dot(self.input[:-1], self.W.T) + self.b) * s )
+        z = np.dot(self.input[:-1], self.W.T) + self.b
+        gamma = ( 0.5/self.temp * z * s )
+        '''
+        This Gamma can be very large if we use a large lr for no_transit case.
+        The reason is because that the time-step in some cases is very large, which is taking into account
+        to compute the gradients.
+        '''
+        #print(gamma)
+        Gamma = np.exp(gamma)
         #new_s = (1 - 2 * self.input[:-1]) * Gamma * self.time_step[:, np.newaxis]
         new_s = (1 - 2 * self.input[:-1]) * Gamma * self.time_step
+        #print(np.max(new_s))
         w_grad = - 0.5/self.temp * np.dot(new_s.T, self.input[:-1])
         b_grad = - 0.5/self.temp * np.sum(new_s, axis = 0)
 
@@ -109,48 +122,62 @@ class SRNN(object):
 
     def learn(self):
         w_grad, b_grad = self.get_update()
-        self.W -= self.lr * w_grad
-        self.b -= self.lr * b_grad
+        self.W += self.lr_1 * w_grad
+        #self.b += self.lr_1 * b_grad
 
     def learn_no_transit(self):
         w_grad, b_grad = self.get_update_no_transit()
-        self.W -= self.lr * w_grad
-        self.b -= self.lr * b_grad
+        self.W += self.lr_2 * w_grad
+        #self.b += self.lr_2 * b_grad
 
 
-EPOCHS = 10
-LR = 0.01
+EPOCHS = 500
+# LR1 = 0.001
+# LR2 = 0.0001
 BATCH_SIZE = 1
 
 
-def learn_ETL(data, time_steps, lr):
+def learn_ETL(data, time_steps, lr1, lr2):
 
+    ori_w = np.load('../data/sanity_w.npy')
     num_samples = data.shape[0]
-    srnn = SRNN(n_units=data.shape[1])
+    srnn = SRNN(n_units=data.shape[1], lr_1= lr1, lr_2=lr2)
+
+    path = '../result/lr1_' + str(lr1) + '/lr2_' + str(lr2)
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+    rmse_error = []
 
     for epoch in range(EPOCHS):
         for i in range(num_samples-1):
-            srnn.input = data[i:i+BATCH_SIZE,:]
+            srnn.input = data[i:i+BATCH_SIZE+1,:]
             srnn.time_step = time_steps[i]
+            srnn.learn_no_transit()
             srnn.learn()
-            #srnn.learn_no_transit()
 
-    ret_W = srnn.W
-    print(ret_W.shape)
-    ret_b = srnn.b
+        ret_W = srnn.W
+        error = abs_error(ret_W, ori_w)
+        rmse_error += [error]
 
-    ori_w = np.load('../data/sanity_w.npy')
-    print(ori_w.shape)
-    ori_b = np.load('../data/sanity_b.npy')
+        if (epoch + 1) % 20 == 0:
+            plt.figure()
+            plt.plot(ret_W.ravel())
+            plt.plot(ori_w.ravel())
+            plt.legend(['Recovered weights', 'Original weights'])
+            weight_path = path + '/weights_epoch_' + str(epoch) + '.pdf'
+            plt.savefig(weight_path)
+            #lr1 /= 10
 
-    print(ret_W)
 
-    print(ori_w)
-    plt.plot(ret_W.ravel())
-    plt.plot(ori_w.ravel())
-    plt.legend(['recover', 'origin'])
-    plt.show()
-    #
+    plt.figure()
+    plt.plot(np.arange(len(rmse_error)), rmse_error)
+    plt.xlabel('Number of Epcohes')
+    plt.ylabel('Error')
+    error_path = path + '/Abs.pdf'
+    plt.savefig(error_path)
+    #print(rmse_error)
+
     # plt.plot(ret_b)
     # plt.plot(ori_b)
     # plt.show()
@@ -158,10 +185,16 @@ def learn_ETL(data, time_steps, lr):
 
 if __name__ == '__main__':
 
-    data = np.load('../data/sanity_data.npy')
-    time_steps = np.load('../data/sanity_time_steps.npy')[:-1]
-    learn_ETL(data,time_steps,LR)
+    lr_1_list = [0.00001, 0.0001, 0.001]
+    lr_2_list = [0.000001, 0.00001, 0.0001, 0.001]
 
+    for LR1 in lr_1_list:
+        for LR2 in lr_2_list:
+            data = np.load('../data/sanity_data.npy')
+            time_steps = np.load('../data/sanity_time_steps.npy')[:-1]
+            print(np.max(time_steps))
+            print(time_steps)
+            learn_ETL(data,time_steps,LR1, LR2)
 
     #srnn = SRNN(n_units = 4, input=data, time_steps= time_steps)
 

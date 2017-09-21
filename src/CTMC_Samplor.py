@@ -19,7 +19,8 @@ class CTMC_Samplor(object):
         np.fill_diagonal(self.W,0)
 
         if b is None:
-            self.b = self.rng.normal(0, 1/self.n_units, size=(self.n_units,))
+            #self.b = self.rng.normal(0, 1/self.n_units, size=(self.n_units,))
+            self.b = np.zeros((self.n_units))
         else:
             self.b = b
             # Note here b is a 1-d tensor, so if we changed self.x to a 2-d array, we need to change b respectively.
@@ -56,7 +57,7 @@ class CTMC_Samplor(object):
 
             flip_bit = np.random.choice(a=self.n_units, size=1,p=transit_prob)
             self.x[flip_bit] = 1 - self.x[flip_bit]
-        return samples,time_intervals
+        return samples, time_intervals
 
 if __name__ == '__main__':
 
