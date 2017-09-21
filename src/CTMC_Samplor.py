@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 class CTMC_Samplor(object):
     def __init__(self, num_units, W = None, b = None, np_rng = None, temp=1):
@@ -66,6 +67,11 @@ if __name__ == '__main__':
 
     weight = ctmc_Samplor.W
     bias = ctmc_Samplor.b
+
+    path = '../data'
+    if not os.path.exists(path):
+        os.makedirs(path)
+
 
     np.save('../data/sanity_data.npy', samples)
     np.save('../data/sanity_time_steps.npy', time_intervals)
